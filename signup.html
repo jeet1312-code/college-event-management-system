@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign Up — College Event Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<div class="form-wrap">
+  <h2>Create Your Account</h2>
+  <p class="form-sub">Sign up to browse and register for college events.</p>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <form id="signupForm">
+    <label for="name">Full Name</label>
+    <input type="text" id="name" placeholder="Jeet Pandey" required />
+
+    <label for="email">Email</label>
+    <input type="email" id="email" placeholder="jeet@gmail.com" required />
+
+    <label for="password">Password</label>
+    <input type="password" id="password" placeholder="At least 6 characters" required />
+
+    <button type="submit" class="btn btn-primary btn-block">Sign Up</button>
+  </form>
+
+  <p class="form-footer-link">Already have an account? <a href="login.html">Login here</a></p>
+</div>
+
+<footer>
+  <div class="container">College Event Management System &copy; 2026</div>
+</footer>
+
+<script type="module">
+  import { renderNavbar, showError, hideError } from "./js/app.js";
+  import { mountChatbot } from "./js/chatbot.js";
+  import { signup, login } from "./js/auth.js";
+
+  await renderNavbar("signup");
+  mountChatbot();
+
+  const form = document.getElementById("signupForm");
+  const errorMsg = document.getElementById("errorMsg");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideError(errorMsg);
+
+    const name = document.getElementById("name").value;
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    const submitBtn = form.querySelector("button[type=submit]");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creating account...";
+
+    const result = await signup(name, email, password);
+    if (!result.ok) {
+      showError(errorMsg, result.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign Up";
+      return;
+    }
+    // Auto-login after successful signup
+    await login(email, password);
+    window.location.href = "events.html";
+  });
+</script>
+</body>
+</html>

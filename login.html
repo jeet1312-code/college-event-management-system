@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Login — College Event Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<div class="form-wrap">
+  <h2>Welcome Back</h2>
+  <p class="form-sub">Login to register for events and manage your account.</p>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <form id="loginForm">
+    <label for="email">Email</label>
+    <input type="email" id="email" placeholder="jeet@gmail.com" required />
+
+    <label for="password">Password</label>
+    <input type="password" id="password" placeholder="Your password" required />
+
+    <button type="submit" class="btn btn-primary btn-block">Login</button>
+  </form>
+
+  <p class="form-footer-link">New here? <a href="signup.html">Create an account</a></p>
+  <p class="form-footer-link" style="font-size:0.78rem; opacity:.75;">Admin accounts are set up in Firestore — see the setup guide.</p>
+</div>
+
+<footer>
+  <div class="container">College Event Management System &copy; 2026</div>
+</footer>
+
+<script type="module">
+  import { renderNavbar, showError, hideError } from "./js/app.js";
+  import { mountChatbot } from "./js/chatbot.js";
+  import { login } from "./js/auth.js";
+
+  await renderNavbar("login");
+  mountChatbot();
+
+  const form = document.getElementById("loginForm");
+  const errorMsg = document.getElementById("errorMsg");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideError(errorMsg);
+
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    const submitBtn = form.querySelector("button[type=submit]");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Logging in...";
+
+    const result = await login(email, password);
+    if (!result.ok) {
+      showError(errorMsg, result.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Login";
+      return;
+    }
+    window.location.href = result.user.role === "admin" ? "admin-dashboard.html" : "events.html";
+  });
+</script>
+</body>
+</html>

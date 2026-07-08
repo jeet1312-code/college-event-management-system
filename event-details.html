@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Event Details — College Event Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<section class="section">
+  <div class="container" id="detailWrap" style="max-width:640px;">
+    <!-- filled by JS -->
+  </div>
+  <div class="container" id="galleryWrap" style="max-width:640px; margin-top:10px;">
+    <!-- filled by JS -->
+  </div>
+</section>
+
+<footer>
+  <div class="container">College Event Management System &copy; 2026</div>
+</footer>
+
+<script type="module">
+  import { renderNavbar, escapeHtml, formatDate, getParam, getCurrentUserProfile } from "./js/app.js";
+  import { mountChatbot } from "./js/chatbot.js";
+  import { getEventById, seatsLeft } from "./js/events.js";
+  import { registerForEvent, cancelRegistration, isRegistered, getRegistrations } from "./js/registration.js";
+  import { downloadICS } from "./js/ics.js";
+  import { mountCountdown } from "./js/countdown.js";
+  import { downloadCertificate } from "./js/certificate.js";
+
+
+  await renderNavbar("events");
+  mountChatbot();
+
+  const wrap = document.getElementById("detailWrap");
+  const galleryWrap = document.getElementById("galleryWrap");
+  const id = getParam("id");
+  const event = await getEventById(id);
+  let stopCountdown = () => {};
+
+  if (!event) {
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">🚫</div><p>Event not found.</p><a href="events.html" class="btn btn-navy" style="margin-top:10px;">Back to Events</a></div>`;
+  } else {
+    await draw();
+    await drawGallery();
+  }
+
+  async function draw() {
+  const user = await getCurrentUserProfile();
+  const left = await seatsLeft(event.id);
+  const full = left <= 0;
+  const alreadyRegistered = user && (await isRegistered(event.id, user.uid));
+
+  // Check if event has already passed
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const eventDate = new Date(event.date);
+  eventDate.setHours(0, 0, 0, 0);
+
+  const isPast = eventDate < today;
+
+  let actionHtml = "";
+
+  if (!user) {
+    actionHtml = `<a href="login.html" class="btn btn-primary btn-block">Login to Register</a>`;
+  } else if (user.role === "admin") {
+
+  } else if (alreadyRegistered) {
+    if (isPast) {
+      actionHtml = `<button class="btn btn-block" disabled>Event Completed</button>`;
+    } else {
+      actionHtml = `<button class="btn btn-danger btn-block" id="cancelBtn">Cancel My Registration</button>`;
+    }
+  } else if (isPast) {
+    actionHtml = `<button class="btn btn-block" disabled>Registration Closed</button>`;
+  } else if (full) {
+    actionHtml = `<button class="btn btn-block" disabled>Event Full</button>`;
+  } else {
+    actionHtml = `<button class="btn btn-primary btn-block" id="registerBtn">Register Now</button>`;
+  }
+
+  wrap.innerHTML = `
+    <div class="card">
+      <span class="badge badge-gold" style="margin-bottom:10px;">${formatDate(event.date)}</span>
+
+      <h2 style="font-size:1.6rem;">${escapeHtml(event.title)}</h2>
+
+      <p class="meta-row" style="margin-bottom:4px;">
+        📍 ${escapeHtml(event.venue)}
+      </p>
+
+      <p class="meta-row" style="margin-bottom:16px;">
+        🎟️ ${full ? 'Fully booked' : left + ' seats left'}
+      </p>
+
+      <div id="countdownSlot" style="margin-bottom:18px;"></div>
+
+      ${
+        isPast
+          ? `<div class="success-msg show" style="margin-bottom:18px;">🎉 This event has started / passed</div>`
+          : ""
+      }
+
+      <p style="margin-bottom:22px;">
+        ${escapeHtml(event.description || "No description provided.")}
+      </p>
+
+      ${
+        alreadyRegistered
+          ? `<div class="success-msg show" style="margin-bottom:14px;">
+              ✅ You're registered for this event. A confirmation email is on its way.
+            </div>`
+          : ""
+      }
+
+      <div id="msgSlot"></div>
+
+      ${actionHtml}
+
+      <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" id="icsBtn">
+          📅 Add to Calendar
+        </button>
+
+        ${
+          alreadyRegistered && isPast
+            ? `<button class="btn btn-teal btn-sm" id="certBtn">
+                🎓 Download Certificate
+              </button>`
+            : ""
+        }
+      </div>
+    </div>
+  `;
+
+  stopCountdown();
+  stopCountdown = mountCountdown(
+    document.getElementById("countdownSlot"),
+    event.date
+  );
+
+  document
+    .getElementById("icsBtn")
+    .addEventListener("click", () => downloadICS(event));
+
+  const certBtn = document.getElementById("certBtn");
+  if (certBtn) {
+    certBtn.addEventListener("click", () => {
+      downloadCertificate({
+        studentName: user.name,
+        eventTitle: event.title,
+        eventDate: event.date,
+        venue: event.venue,
+      });
+    });
+  }
+
+  const registerBtn = document.getElementById("registerBtn");
+  if (registerBtn) {
+    registerBtn.addEventListener("click", async () => {
+      registerBtn.disabled = true;
+
+      const result = await registerForEvent(event.id, user, seatsLeft, {
+        title: event.title,
+        date: formatDate(event.date),
+        venue: event.venue,
+      });
+
+      if (!result.ok) {
+        document.getElementById(
+          "msgSlot"
+        ).innerHTML = `<div class="error-msg show">${result.message}</div>`;
+        registerBtn.disabled = false;
+        return;
+      }
+
+      await draw();
+    });
+  }
+
+  const cancelBtn = document.getElementById("cancelBtn");
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", async () => {
+      const regs = await getRegistrations();
+
+      const reg = regs.find(
+        (r) =>
+          String(r.eventId) === String(event.id) &&
+          r.studentUid === user.uid
+      );
+
+      if (reg) {
+        await cancelRegistration(reg.id);
+      }
+
+      await draw();
+    });
+  }
+}
+
+  async function drawGallery() {
+    const images = await getGalleryImages(event.id);
+    if (images.length === 0) return;
+    galleryWrap.innerHTML = `
+      <div class="card" style="margin-top:20px;">
+        <h3 style="font-size:1.05rem; margin-bottom:12px;">📸 Event Gallery</h3>
+        <div class="gallery-grid">
+          ${images.map(img => `<a href="${img.url}" target="_blank"><img src="${img.url}" alt="Event photo" /></a>`).join("")}
+        </div>
+      </div>
+    `;
+  }
+</script>
+</body>
+</html>

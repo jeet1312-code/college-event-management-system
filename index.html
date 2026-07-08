@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>College Event Management System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<section class="hero">
+  <div class="container">
+    <span class="eyebrow" style="color:#f0a500;">College Event Management System</span>
+    <h1>Welcome to College Event<br/>Management System</h1>
+    <p class="lead">Discover, register for, and manage college events, all in one place. Students browse and join events in a few clicks; admins create and track everything from a single dashboard.</p>
+    <div style="margin-top:24px; display:flex; gap:12px; flex-wrap:wrap;">
+      <a href="events.html" class="btn btn-primary">Browse Events</a>
+      <a href="signup.html" class="btn btn-outline" style="color:#fff; border-color:#fff;">Get Started</a>
+    </div>
+    <div class="hero-stats" id="heroStats"></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-title">
+      <div>
+        <span class="eyebrow">Upcoming</span>
+        <h2>Upcoming Events</h2>
+      </div>
+      <a href="events.html" class="btn btn-outline btn-sm">View All Events →</a>
+    </div>
+    <div class="grid grid-3" id="upcomingEvents"></div>
+  </div>
+</section>
+
+<section class="section" style="background:#fff; border-top:1px solid #e3ddd0; border-bottom:1px solid #e3ddd0;">
+  <div class="container">
+    <div class="section-title" style="justify-content:center; text-align:center; flex-direction:column;">
+      <span class="eyebrow">How it works</span>
+      <h2>Your Journey in 5 Steps</h2>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="circle">1</div><p>Sign Up / Login</p></div>
+      <div class="step"><div class="circle">2</div><p>Browse Events</p></div>
+      <div class="step"><div class="circle">3</div><p>Register for Event</p></div>
+      <div class="step"><div class="circle">4</div><p>View My Events</p></div>
+      <div class="step"><div class="circle">5</div><p>Attend & Enjoy</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">College Event Management System &copy; 2026 — Built with HTML, CSS & JavaScript</div>
+</footer>
+
+<script type="module">
+  import { renderNavbar, escapeHtml, formatDate } from "./js/app.js";
+  import { mountChatbot } from "./js/chatbot.js";
+  import { seedEvents, getEvents, seatsLeft } from "./js/events.js";
+  import { getRegistrations } from "./js/registration.js";
+  import { db } from "./js/firebase-config.js";
+  import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  await seedEvents();
+  await renderNavbar("home");
+  mountChatbot();
+
+  // Hero stats
+  const events = await getEvents();
+  const regs = await getRegistrations();
+  const studentsSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+  document.getElementById("heroStats").innerHTML = `
+    <div class="hero-stat"><div class="num">${events.length}</div><div class="label">Events</div></div>
+    <div class="hero-stat"><div class="num">${regs.length}</div><div class="label">Registrations</div></div>
+    <div class="hero-stat"><div class="num">${studentsSnap.size}</div><div class="label">Students</div></div>
+  `;
+
+  // Upcoming events (first 3)
+  const upcomingWrap = document.getElementById("upcomingEvents");
+  const upcoming = events.slice(0, 3);
+  if (upcoming.length === 0) {
+    upcomingWrap.innerHTML = `<div class="empty-state"><div class="icon">📅</div><p>No events yet. Check back soon!</p></div>`;
+  } else {
+    const cards = await Promise.all(upcoming.map(async e => `
+      <div class="event-card">
+        <div class="banner"></div>
+        <div class="body">
+          <span class="badge badge-gold">${formatDate(e.date)}</span>
+          <h3>${escapeHtml(e.title)}</h3>
+          <div class="meta-row">📍 ${escapeHtml(e.venue)}</div>
+          <div class="meta-row">🎟️ ${await seatsLeft(e.id)} seats left</div>
+          <div class="footer-row">
+            <a href="event-details.html?id=${e.id}" class="btn btn-navy btn-sm">View Details</a>
+          </div>
+        </div>
+      </div>
+    `));
+    upcomingWrap.innerHTML = cards.join("");
+  }
+</script>
+</body>
+</html>

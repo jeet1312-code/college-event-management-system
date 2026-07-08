@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin Dashboard — College Event Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<section class="section">
+  <div class="container admin-layout">
+    <aside class="admin-side">
+      <a href="admin-dashboard.html" class="active">📊 Dashboard</a>
+      <a href="add-event.html">➕ Add Event</a>
+      <a href="events.html">📅 All Events</a>
+      <a href="profile.html">👤 Profile</a>
+    </aside>
+
+    <div>
+      <div class="section-title">
+        <div>
+          <span class="eyebrow">Overview</span>
+          <h2>Admin Dashboard</h2>
+        </div>
+        <a href="add-event.html" class="btn btn-primary btn-sm">+ Add New Event</a>
+      </div>
+
+      <div class="grid grid-3" id="statsRow" style="margin-bottom:32px;"></div>
+
+      <div class="section-title">
+        <h2 style="font-size:1.2rem;">Recent Events</h2>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr><th>Title</th><th>Date</th><th>Venue</th><th>Seats</th><th>Registered</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="recentEventsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">College Event Management System &copy; 2026</div>
+</footer>
+
+<script type="module">
+  import { renderNavbar, requireAdmin, escapeHtml, formatDate } from "./js/app.js";
+  import { mountChatbot } from "./js/chatbot.js";
+  import { deleteEvent } from "./js/events.js";
+  import { getAdminStats, getRecentEvents } from "./js/admin.js";
+
+  const user = await requireAdmin();
+  if (user) {
+    await renderNavbar("admin-dashboard");
+  mountChatbot();
+    await draw();
+  }
+
+  async function draw() {
+    const stats = await getAdminStats();
+    document.getElementById("statsRow").innerHTML = `
+      <div class="stat-tile"><div class="stat-num">${stats.totalEvents}</div><div class="stat-label">Total Events</div></div>
+      <div class="stat-tile"><div class="stat-num">${stats.totalRegistrations}</div><div class="stat-label">Total Registrations</div></div>
+      <div class="stat-tile"><div class="stat-num">${stats.totalStudents}</div><div class="stat-label">Total Students</div></div>
+    `;
+
+    const recent = await getRecentEvents(10);
+    const tbody = document.getElementById("recentEventsBody");
+    if (recent.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#5a6478;">No events yet. Add your first event!</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = recent.map(e => `
+      <tr>
+        <td><strong>${escapeHtml(e.title)}</strong></td>
+        <td>${formatDate(e.date)}</td>
+        <td>${escapeHtml(e.venue)}</td>
+        <td>${e.seats}</td>
+        <td>${e.taken}</td>
+        <td style="display:flex; gap:6px; flex-wrap:wrap;">
+          <a href="participants.html?id=${e.id}" class="btn btn-outline btn-sm">Participants</a>
+          <a href="add-event.html?id=${e.id}" class="btn btn-navy btn-sm">Edit</a>
+          <button class="btn btn-danger btn-sm" data-delid="${e.id}">Delete</button>
+        </td>
+      </tr>
+    `).join("");
+
+    tbody.querySelectorAll("button[data-delid]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Delete this event? This will also remove its registrations.")) return;
+        await deleteEvent(btn.dataset.delid);
+        await draw();
+      });
+    });
+  }
+</script>
+</body>
+</html>

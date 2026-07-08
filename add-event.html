@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Add / Edit Event — College Event Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<div class="form-wrap wide">
+  <h2 id="formTitle">Add New Event</h2>
+  <p class="form-sub" id="formSub">Fill in the details below to publish a new event.</p>
+
+  <div class="error-msg" id="errorMsg"></div>
+  <div class="success-msg" id="successMsg"></div>
+
+  <form id="eventForm">
+    <label for="title">Event Title</label>
+    <input type="text" id="title" placeholder="Hackathon 2024" required />
+
+    <div class="form-row-2">
+      <div>
+        <label for="date">Date</label>
+        <input type="date" id="date" required />
+      </div>
+      <div>
+        <label for="seats">Total Seats</label>
+        <input type="number" id="seats" min="1" placeholder="60" required />
+      </div>
+    </div>
+
+    <label for="venue">Venue</label>
+    <input type="text" id="venue" placeholder="Seminar Hall" required />
+
+    <label for="description">Description</label>
+    <textarea id="description" placeholder="24 Hour Coding Challenge open to all branches..."></textarea>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <label style="margin-bottom:0;">Interest Tags <span style="font-weight:400; color:#5a6478;">(helps recommend this event to students)</span></label>
+      <button type="button" id="suggestTagsBtn" class="btn btn-outline btn-sm">✨ AI Suggest Tags</button>
+    </div>
+    <div id="tagsBox" class="tags-box"></div>
+
+    <button type="submit" class="btn btn-primary btn-block" id="submitBtn" style="margin-top:18px;">Publish Event</button>
+  </form>
+</div>
+
+<footer>
+  <div class="container">College Event Management System &copy; 2026</div>
+</footer>
+
+<script type="module">
+  import { renderNavbar, requireAdmin, getParam, showError, hideError } from "./js/app.js";
+  import { mountChatbot } from "./js/chatbot.js";
+  import { getEventById, addEvent, updateEvent } from "./js/events.js";
+  import { ALL_TAGS, suggestTags } from "./js/recommend.js";
+
+  const user = await requireAdmin();
+  const editId = getParam("id");
+  const isEdit = !!editId;
+
+  // Build the tag checkbox list
+  const tagsBox = document.getElementById("tagsBox");
+  tagsBox.innerHTML = ALL_TAGS.map(tag => `
+    <label class="tag-chip">
+      <input type="checkbox" value="${tag}" /> ${tag}
+    </label>
+  `).join("");
+
+  function getSelectedTags() {
+    return [...tagsBox.querySelectorAll("input:checked")].map(i => i.value);
+  }
+  function setSelectedTags(tags) {
+    tagsBox.querySelectorAll("input").forEach(i => { i.checked = tags.includes(i.value); });
+  }
+
+  document.getElementById("suggestTagsBtn").addEventListener("click", () => {
+    const title = document.getElementById("title").value;
+    const description = document.getElementById("description").value;
+    if (!title.trim() && !description.trim()) {
+      alert("Add a title or description first, then I can suggest tags.");
+      return;
+    }
+    setSelectedTags(suggestTags(title, description));
+  });
+
+  if (user) {
+    await renderNavbar("add-event");
+    mountChatbot();
+    if (isEdit) {
+      const event = await getEventById(editId);
+      if (event) {
+        document.getElementById("formTitle").textContent = "Edit Event";
+        document.getElementById("formSub").textContent = "Update the details below.";
+        document.getElementById("submitBtn").textContent = "Save Changes";
+        document.getElementById("title").value = event.title;
+        document.getElementById("date").value = event.date;
+        document.getElementById("seats").value = event.seats;
+        document.getElementById("venue").value = event.venue;
+        document.getElementById("description").value = event.description || "";
+        setSelectedTags(event.tags || []);
+      }
+    }
+  }
+
+  const form = document.getElementById("eventForm");
+  const errorMsg = document.getElementById("errorMsg");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideError(errorMsg);
+
+    const data = {
+      title: document.getElementById("title").value,
+      date: document.getElementById("date").value,
+      seats: document.getElementById("seats").value,
+      venue: document.getElementById("venue").value,
+      description: document.getElementById("description").value,
+      tags: getSelectedTags(),
+    };
+
+    if (!data.title.trim() || !data.venue.trim() || !data.date || Number(data.seats) < 1) {
+      showError(errorMsg, "Please fill in all required fields correctly.");
+      return;
+    }
+
+    const submitBtn = document.getElementById("submitBtn");
+    submitBtn.disabled = true;
+
+    if (isEdit) {
+      await updateEvent(editId, data);
+    } else {
+      await addEvent(data);
+    }
+    window.location.href = "admin-dashboard.html";
+  });
+</script>
+</body>
+</html>

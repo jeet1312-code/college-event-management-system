@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>All Events — College Event Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<section class="section" style="padding-bottom:0;">
+  <div class="container">
+    <div id="recommendedWrap"></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-title">
+      <div>
+        <span class="eyebrow">Explore</span>
+        <h2>All Events</h2>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by title, venue, or keyword..." />
+      </div>
+      <select id="dateFilter">
+        <option value="">All Dates</option>
+      </select>
+    </div>
+
+    <div class="grid grid-3" id="eventsList"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">College Event Management System &copy; 2026</div>
+</footer>
+
+<script type="module">
+  import { renderNavbar, escapeHtml, formatDate, getCurrentUserProfile } from "./js/app.js";
+  import { mountChatbot } from "./js/chatbot.js";
+  import { seedEvents, getEvents, searchEvents, seatsLeft } from "./js/events.js";
+  import { getMyRegistrations } from "./js/registration.js";
+  import { getRecommendedEvents } from "./js/recommend.js";
+
+  await seedEvents();
+  await renderNavbar("events");
+  mountChatbot();
+
+  // --- AI Recommended For You (students only) ---
+  const user = await getCurrentUserProfile();
+  const recWrap = document.getElementById("recommendedWrap");
+  if (user && user.role === "student") {
+    const recommended = await getRecommendedEvents(user, { getEvents, getMyRegistrations, seatsLeft });
+    if (recommended.length > 0) {
+      const cards = await Promise.all(recommended.map(async e => {
+        const left = await seatsLeft(e.id);
+        const tagHtml = (e.tags || []).map(t => `<span class="tag-pill">${escapeHtml(t)}</span>`).join("");
+        return `
+        <div class="event-card">
+          <div class="banner"></div>
+          <div class="body">
+            <span class="badge badge-gold">${formatDate(e.date)}</span>
+            <h3>${escapeHtml(e.title)}</h3>
+            <div class="meta-row">📍 ${escapeHtml(e.venue)}</div>
+            <div class="meta-row">${tagHtml}</div>
+            <div class="footer-row">
+              <span class="badge badge-open">${left} seats left</span>
+              <a href="event-details.html?id=${e.id}" class="btn btn-navy btn-sm">View</a>
+            </div>
+          </div>
+        </div>`;
+      }));
+      recWrap.innerHTML = `
+        <div class="section-title">
+          <div>
+            <span class="eyebrow">✨ AI Picks</span>
+            <h2>Recommended For You</h2>
+          </div>
+        </div>
+        <div class="grid grid-3">${cards.join("")}</div>
+      `;
+    }
+  }
+
+  const listEl = document.getElementById("eventsList");
+  const searchInput = document.getElementById("searchInput");
+  const dateFilter = document.getElementById("dateFilter");
+
+  // Populate date filter dropdown from existing events
+  const allEvents = await getEvents();
+  const uniqueDates = [...new Set(allEvents.map(e => e.date))].sort();
+  dateFilter.innerHTML += uniqueDates.map(d => `<option value="${d}">${formatDate(d)}</option>`).join("");
+
+  async function render() {
+    const results = await searchEvents(searchInput.value, dateFilter.value);
+    if (results.length === 0) {
+      listEl.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="icon">🔍</div><p>No events match your search.</p></div>`;
+      return;
+    }
+    const cards = await Promise.all(results.map(async e => {
+      const left = await seatsLeft(e.id);
+      const full = left <= 0;
+      const tagHtml = (e.tags || []).map(t => `<span class="tag-pill">${escapeHtml(t)}</span>`).join("");
+      return `
+      <div class="event-card">
+        <div class="banner"></div>
+        <div class="body">
+          <span class="badge badge-gold">${formatDate(e.date)}</span>
+          <h3>${escapeHtml(e.title)}</h3>
+          <div class="meta-row">📍 ${escapeHtml(e.venue)}</div>
+          <div class="meta-row">${tagHtml}</div>
+          <div class="meta-row">
+            <span class="badge ${full ? 'badge-full' : 'badge-open'}">${full ? 'Full' : left + ' seats left'}</span>
+          </div>
+          <div class="footer-row">
+            <a href="event-details.html?id=${e.id}" class="btn btn-navy btn-sm">View</a>
+          </div>
+        </div>
+      </div>`;
+    }));
+    listEl.innerHTML = cards.join("");
+  }
+
+  searchInput.addEventListener("input", render);
+  dateFilter.addEventListener("change", render);
+  render();
+</script>
+</body>
+</html>

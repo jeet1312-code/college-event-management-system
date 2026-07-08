@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Events — College Event Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<section class="section">
+  <div class="container">
+    <div class="section-title">
+      <div>
+        <span class="eyebrow">Your registrations</span>
+        <h2>My Events</h2>
+      </div>
+      <a href="events.html" class="btn btn-outline btn-sm">Browse More Events</a>
+    </div>
+    <div id="myEventsList"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">College Event Management System &copy; 2026</div>
+</footer>
+
+<script type="module">
+  import { renderNavbar, requireAuth, escapeHtml, formatDate } from "./js/app.js";
+  import { mountChatbot } from "./js/chatbot.js";
+  import { getEventById } from "./js/events.js";
+  import { getMyRegistrations, cancelRegistration } from "./js/registration.js";
+
+  const user = await requireAuth();
+  if (user) {
+    await renderNavbar("my-events");
+  mountChatbot();
+    await draw();
+  }
+
+  async function draw() {
+    const regs = await getMyRegistrations(user.uid);
+    const listEl = document.getElementById("myEventsList");
+
+    if (regs.length === 0) {
+      listEl.innerHTML = `<div class="empty-state"><div class="icon">🗓️</div><p>You haven't registered for any events yet.</p><a href="events.html" class="btn btn-navy" style="margin-top:10px;">Browse Events</a></div>`;
+      return;
+    }
+
+    const cards = await Promise.all(regs.map(async r => {
+      const event = await getEventById(r.eventId);
+      if (!event) return "";
+      return `
+          <div class="event-card">
+            <div class="banner"></div>
+            <div class="body">
+              <span class="badge badge-gold">${formatDate(event.date)}</span>
+              <h3>${escapeHtml(event.title)}</h3>
+              <div class="meta-row">📍 ${escapeHtml(event.venue)}</div>
+              <div class="meta-row">Registered on ${formatDate(r.regDate)}</div>
+              <div class="footer-row">
+                <a href="event-details.html?id=${event.id}" class="btn btn-outline btn-sm">Details</a>
+                <button class="btn btn-danger btn-sm" data-regid="${r.id}">Cancel</button>
+              </div>
+            </div>
+          </div>`;
+    }));
+
+    listEl.innerHTML = `<div class="grid grid-3">${cards.join("")}</div>`;
+
+    listEl.querySelectorAll("button[data-regid]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await cancelRegistration(btn.dataset.regid);
+        await draw();
+      });
+    });
+  }
+</script>
+</body>
+</html>

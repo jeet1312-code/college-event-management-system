@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Participants — College Event Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<section class="section">
+  <div class="container">
+    <div class="section-title">
+      <div>
+        <span class="eyebrow">Registered students</span>
+        <h2 id="pageTitle">Participants</h2>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline btn-sm" id="exportBtn">⬇ Export CSV</button>
+        <a href="admin-dashboard.html" class="btn btn-navy btn-sm">Back to Dashboard</a>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Registered On</th><th>Action</th></tr></thead>
+        <tbody id="participantsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">College Event Management System &copy; 2026</div>
+</footer>
+
+<script type="module">
+  import { renderNavbar, requireAdmin, getParam, escapeHtml, formatDate } from "./js/app.js";
+  import { mountChatbot } from "./js/chatbot.js";
+  import { getEventById } from "./js/events.js";
+  import { getParticipantsForEvent, cancelRegistration } from "./js/registration.js";
+  import { exportParticipantsCSV } from "./js/admin.js";
+
+  const user = await requireAdmin();
+  const eventId = getParam("id");
+  const event = eventId ? await getEventById(eventId) : null;
+
+  if (user) {
+    await renderNavbar("admin-dashboard");
+  mountChatbot();
+    if (event) {
+      document.getElementById("pageTitle").textContent = `Participants — ${event.title}`;
+    }
+    await draw();
+  }
+
+  async function draw() {
+    const rows = await getParticipantsForEvent(eventId);
+    const tbody = document.getElementById("participantsBody");
+    if (rows.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#5a6478;">No participants registered yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${escapeHtml(r.studentName)}</td>
+        <td>${escapeHtml(r.studentEmail)}</td>
+        <td>${formatDate(r.regDate)}</td>
+        <td><button class="btn btn-danger btn-sm" data-regid="${r.id}">Remove</button></td>
+      </tr>
+    `).join("");
+
+    tbody.querySelectorAll("button[data-regid]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Remove this participant's registration?")) return;
+        await cancelRegistration(btn.dataset.regid);
+        await draw();
+      });
+    });
+  }
+
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    exportParticipantsCSV(eventId, event ? event.title : "event");
+  });
+</script>
+</body>
+</html>
